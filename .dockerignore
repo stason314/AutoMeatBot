@@ -2,7 +2,7 @@
 .env
 bin
 obj
-data
-logs
+/data
+/logs
 **/bin
 **/obj
