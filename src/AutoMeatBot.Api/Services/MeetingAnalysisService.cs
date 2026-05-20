@@ -33,11 +33,12 @@ public sealed class MeetingAnalysisService(
             return;
         }
 
-        await UpsertMeetingAsync(chat, messages, extraction, cancellationToken);
+        await UpsertMeetingAsync(chat, triggerMessage, messages, extraction, cancellationToken);
     }
 
     private async Task UpsertMeetingAsync(
         TelegramChat chat,
+        ChatMessage triggerMessage,
         IReadOnlyList<ChatMessage> messages,
         AiMeetingExtraction extraction,
         CancellationToken cancellationToken)
@@ -50,11 +51,28 @@ public sealed class MeetingAnalysisService(
             MeetingStatus.ConfirmedByAi
         };
 
-        var meeting = await db.MeetingCandidates
-            .Include(item => item.Participants)
-            .Where(item => item.ChatId == chat.Id && activeStatuses.Contains(item.Status))
-            .OrderByDescending(item => item.UpdatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
+        var shouldStartSeparateMeeting = extraction.IsNewMeeting || LooksLikeSeparateMeeting(triggerMessage.Text);
+        MeetingCandidate? meeting = null;
+
+        if (shouldStartSeparateMeeting)
+        {
+            meeting = await db.MeetingCandidates
+                .Include(item => item.Participants)
+                .Where(item =>
+                    item.ChatId == chat.Id &&
+                    activeStatuses.Contains(item.Status) &&
+                    item.SourceLastMessageId == triggerMessage.TelegramMessageId)
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        else
+        {
+            meeting = await db.MeetingCandidates
+                .Include(item => item.Participants)
+                .Where(item => item.ChatId == chat.Id && activeStatuses.Contains(item.Status))
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
 
         var now = DateTime.UtcNow;
         if (meeting is null)
@@ -85,7 +103,11 @@ public sealed class MeetingAnalysisService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Meeting {MeetingId} updated from chat {ChatId}", meeting.Id, chat.Id);
+        logger.LogInformation(
+            "Meeting {MeetingId} updated from chat {ChatId}; separate={IsSeparateMeeting}",
+            meeting.Id,
+            chat.Id,
+            shouldStartSeparateMeeting);
     }
 
     private async Task UpsertParticipantAsync(
@@ -206,6 +228,40 @@ public sealed class MeetingAnalysisService(
     private static string NormalizeToken(string? value)
     {
         return (value ?? "").Trim().Replace("_", "", StringComparison.Ordinal).ToLowerInvariant();
+    }
+
+    private static bool LooksLikeSeparateMeeting(string text)
+    {
+        var normalized = text.Trim().ToLowerInvariant();
+        if (normalized.Length == 0)
+        {
+            return false;
+        }
+
+        var hasMeetingIntent =
+            normalized.Contains("созвон", StringComparison.Ordinal) ||
+            normalized.Contains("встреч", StringComparison.Ordinal) ||
+            normalized.Contains("собер", StringComparison.Ordinal) ||
+            normalized.Contains("обсуд", StringComparison.Ordinal) ||
+            normalized.Contains("meeting", StringComparison.Ordinal) ||
+            normalized.Contains("call", StringComparison.Ordinal);
+
+        if (!hasMeetingIntent)
+        {
+            return false;
+        }
+
+        return normalized.Contains("другой вопрос", StringComparison.Ordinal) ||
+            normalized.Contains("дополнительно", StringComparison.Ordinal) ||
+            normalized.Contains("отдельно", StringComparison.Ordinal) ||
+            normalized.Contains("ещё", StringComparison.Ordinal) ||
+            normalized.Contains(" еще ", StringComparison.Ordinal) ||
+            normalized.StartsWith("еще ", StringComparison.Ordinal) ||
+            normalized.Contains("след недел", StringComparison.Ordinal) ||
+            normalized.Contains("следующей недел", StringComparison.Ordinal) ||
+            normalized.Contains("next week", StringComparison.Ordinal) ||
+            normalized.Contains("another", StringComparison.Ordinal) ||
+            normalized.Contains("separate", StringComparison.Ordinal);
     }
 
     private static string? FirstNonEmpty(params string?[] values)

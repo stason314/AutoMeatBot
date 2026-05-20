@@ -116,6 +116,7 @@ Return strict JSON only, without markdown.
 Use this schema:
 {
   "has_meeting": true,
+  "is_new_meeting": false,
   "meeting_topic": "short topic or null",
   "status": "draft|negotiating|proposed|confirmed_by_ai|cancelled",
   "proposed_datetime": "ISO-8601 datetime with timezone offset or null",
@@ -136,6 +137,9 @@ Use this schema:
 
 Rules:
 - Detect Russian and English meeting discussions.
+- Focus on the latest message first. Use earlier messages as context only.
+- If the latest message introduces another/additional/separate meeting, extract that new meeting instead of updating the previous one and set "is_new_meeting": true.
+- Russian phrases like "еще", "дополнительно", "другой вопрос", "отдельно", "на следующей неделе" can indicate a separate meeting when they appear in the latest message.
 - A meeting can be only a proposal, not final yet.
 - Prefer final agreed time over earlier proposed times.
 - "договорились", "ок", "подтверждаю", "всем ок", "созвонимся", "соберемся", and similar phrases can mean meeting intent or confirmation.
@@ -143,7 +147,7 @@ Rules:
 - If the date is relative, resolve it using current UTC time {{now:O}} and chat timezone {{chatTimeZone}}.
 - If timezone is absent, use {{chatTimeZone}} or {{defaultTimeZone}}.
 - Use null for unknown fields.
-- If there is no meeting discussion, return {"has_meeting":false,"participants":[],"confidence":0.0}.
+- If there is no meeting discussion, return {"has_meeting":false,"is_new_meeting":false,"participants":[],"confidence":0.0}.
 """;
     }
 
@@ -152,6 +156,7 @@ Rules:
         var builder = new StringBuilder();
         builder.AppendLine($"Chat: {chat.Title ?? chat.Username ?? chat.Id.ToString()}");
         builder.AppendLine($"Timezone: {chat.TimeZone}");
+        builder.AppendLine($"Latest message id: {messages.Last().TelegramMessageId}");
         builder.AppendLine("Messages:");
 
         foreach (var message in messages)

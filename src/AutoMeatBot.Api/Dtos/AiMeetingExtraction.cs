@@ -7,6 +7,9 @@ public sealed class AiMeetingExtraction
     [JsonPropertyName("has_meeting")]
     public bool HasMeeting { get; set; }
 
+    [JsonPropertyName("is_new_meeting")]
+    public bool IsNewMeeting { get; set; }
+
     [JsonPropertyName("meeting_topic")]
     public string? MeetingTopic { get; set; }
 
@@ -49,4 +52,3 @@ public sealed class AiParticipant
     [JsonPropertyName("response")]
     public string? Response { get; set; }
 }
-
