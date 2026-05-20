@@ -10,7 +10,7 @@ using System.Text.Json;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<TelegramOptions>(builder.Configuration.GetSection("Telegram"));
-builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
+builder.Services.Configure<DeepSeekOptions>(builder.Configuration.GetSection("DeepSeek"));
 builder.Services.Configure<MeetingExtractionOptions>(builder.Configuration.GetSection("MeetingExtraction"));
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -21,7 +21,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString);
 });
 
-builder.Services.AddHttpClient<IMeetingExtractor, OllamaMeetingExtractor>();
+builder.Services.AddHttpClient<IMeetingExtractor, DeepSeekMeetingExtractor>();
 builder.Services.AddScoped<TelegramWebhookService>();
 builder.Services.AddScoped<MeetingAnalysisService>();
 builder.Services.AddScoped<MeetingMutationService>();

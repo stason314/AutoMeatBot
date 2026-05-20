@@ -2,6 +2,7 @@ using AutoMeatBot.Api.Domain;
 using AutoMeatBot.Api.Dtos;
 using AutoMeatBot.Api.Options;
 using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -9,11 +10,11 @@ using System.Text.Json.Serialization;
 
 namespace AutoMeatBot.Api.Services;
 
-public sealed class OllamaMeetingExtractor(
+public sealed class DeepSeekMeetingExtractor(
     HttpClient httpClient,
-    IOptions<OllamaOptions> options,
+    IOptions<DeepSeekOptions> options,
     IOptions<MeetingExtractionOptions> extractionOptions,
-    ILogger<OllamaMeetingExtractor> logger) : IMeetingExtractor
+    ILogger<DeepSeekMeetingExtractor> logger) : IMeetingExtractor
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -22,55 +23,69 @@ public sealed class OllamaMeetingExtractor(
         IReadOnlyList<ChatMessage> messages,
         CancellationToken cancellationToken)
     {
-        var ollama = options.Value;
-        if (!ollama.Enabled || messages.Count == 0)
+        var deepSeek = options.Value;
+        if (!deepSeek.Enabled || messages.Count == 0)
         {
             return new AiMeetingExtraction();
         }
 
-        var baseUrl = ollama.BaseUrl.TrimEnd('/');
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/api/chat");
-        request.Content = JsonContent.Create(new OllamaChatRequest
+        if (string.IsNullOrWhiteSpace(deepSeek.ApiKey))
         {
-            Model = ollama.Model,
+            logger.LogWarning("DeepSeek API key is not configured");
+            return new AiMeetingExtraction();
+        }
+
+        var baseUrl = deepSeek.BaseUrl.TrimEnd('/');
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(deepSeek.TimeoutSeconds, 10, 180)));
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", deepSeek.ApiKey);
+        request.Content = JsonContent.Create(new DeepSeekChatRequest
+        {
+            Model = deepSeek.Model,
             Stream = false,
-            Format = "json",
+            Temperature = 0.1,
+            MaxTokens = 1200,
+            ResponseFormat = new DeepSeekResponseFormat("json_object"),
+            Thinking = new DeepSeekThinking("disabled"),
             Messages =
             [
-                new OllamaMessage("system", BuildSystemPrompt(chat.TimeZone)),
-                new OllamaMessage("user", BuildUserPrompt(chat, messages))
+                new DeepSeekMessage("system", BuildSystemPrompt(chat.TimeZone)),
+                new DeepSeekMessage("user", BuildUserPrompt(chat, messages))
             ]
         }, options: JsonOptions);
 
-        OllamaChatResponse? ollamaResponse;
+        DeepSeekChatResponse? deepSeekResponse;
         try
         {
-            using var response = await httpClient.SendAsync(request, cancellationToken);
+            using var response = await httpClient.SendAsync(request, timeoutCts.Token);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Ollama request failed with {StatusCode}", response.StatusCode);
+                var error = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogWarning("DeepSeek request failed with {StatusCode}: {Error}", response.StatusCode, error);
                 return new AiMeetingExtraction();
             }
 
-            ollamaResponse = await response.Content.ReadFromJsonAsync<OllamaChatResponse>(JsonOptions, cancellationToken);
+            deepSeekResponse = await response.Content.ReadFromJsonAsync<DeepSeekChatResponse>(JsonOptions, timeoutCts.Token);
         }
         catch (HttpRequestException ex)
         {
-            logger.LogWarning(ex, "Ollama is unavailable");
+            logger.LogWarning(ex, "DeepSeek API is unavailable");
             return new AiMeetingExtraction();
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "Ollama request timed out");
+            logger.LogWarning(ex, "DeepSeek request timed out");
             return new AiMeetingExtraction();
         }
         catch (JsonException ex)
         {
-            logger.LogWarning(ex, "Could not parse Ollama response");
+            logger.LogWarning(ex, "Could not parse DeepSeek response");
             return new AiMeetingExtraction();
         }
 
-        var content = ollamaResponse?.Message?.Content;
+        var content = deepSeekResponse?.Choices.FirstOrDefault()?.Message?.Content;
         if (string.IsNullOrWhiteSpace(content))
         {
             return new AiMeetingExtraction();
@@ -123,7 +138,7 @@ Rules:
 - Detect Russian and English meeting discussions.
 - A meeting can be only a proposal, not final yet.
 - Prefer final agreed time over earlier proposed times.
-- "dogovorilis", "ok", "podtverzhdayu", "vsem ok", and similar phrases can mean confirmation.
+- "договорились", "ок", "подтверждаю", "всем ок", "созвонимся", "соберемся", and similar phrases can mean meeting intent or confirmation.
 - Extract Zoom, Google Meet, Teams, Yandex Telemost, Telegram call, and generic URLs.
 - If the date is relative, resolve it using current UTC time {{now:O}} and chat timezone {{chatTimeZone}}.
 - If timezone is absent, use {{chatTimeZone}} or {{defaultTimeZone}}.
@@ -168,7 +183,7 @@ Rules:
         return first >= 0 && last > first ? trimmed[first..(last + 1)] : trimmed;
     }
 
-    private sealed class OllamaChatRequest
+    private sealed class DeepSeekChatRequest
     {
         [JsonPropertyName("model")]
         public string Model { get; set; } = "";
@@ -176,20 +191,41 @@ Rules:
         [JsonPropertyName("stream")]
         public bool Stream { get; set; }
 
-        [JsonPropertyName("format")]
-        public string Format { get; set; } = "json";
+        [JsonPropertyName("temperature")]
+        public double Temperature { get; set; }
+
+        [JsonPropertyName("max_tokens")]
+        public int MaxTokens { get; set; }
+
+        [JsonPropertyName("response_format")]
+        public DeepSeekResponseFormat ResponseFormat { get; set; } = new("json_object");
+
+        [JsonPropertyName("thinking")]
+        public DeepSeekThinking Thinking { get; set; } = new("disabled");
 
         [JsonPropertyName("messages")]
-        public List<OllamaMessage> Messages { get; set; } = [];
+        public List<DeepSeekMessage> Messages { get; set; } = [];
     }
 
-    private sealed record OllamaMessage(
+    private sealed record DeepSeekMessage(
         [property: JsonPropertyName("role")] string Role,
         [property: JsonPropertyName("content")] string Content);
 
-    private sealed class OllamaChatResponse
+    private sealed record DeepSeekResponseFormat(
+        [property: JsonPropertyName("type")] string Type);
+
+    private sealed record DeepSeekThinking(
+        [property: JsonPropertyName("type")] string Type);
+
+    private sealed class DeepSeekChatResponse
+    {
+        [JsonPropertyName("choices")]
+        public List<DeepSeekChoice> Choices { get; set; } = [];
+    }
+
+    private sealed class DeepSeekChoice
     {
         [JsonPropertyName("message")]
-        public OllamaMessage? Message { get; set; }
+        public DeepSeekMessage? Message { get; set; }
     }
 }

@@ -6,7 +6,7 @@ It includes:
 
 - Telegram webhook receiver.
 - PostgreSQL persistence for chats, users, messages, meeting candidates, and email mappings.
-- Ollama-based local LLM extraction.
+- DeepSeek API based LLM extraction.
 - Simple web UI for reviewing meetings and linking Telegram users to email addresses.
 
 ## Requirements
@@ -15,7 +15,8 @@ It includes:
 - Bot added to target groups.
 - Bot must see group messages: make it an admin or disable Privacy Mode in `@BotFather`.
 - Public HTTPS webhook URL for production, or a tunnel such as ngrok/cloudflared for local testing.
-- Docker for the default local setup, or .NET 8 SDK plus PostgreSQL if running manually.
+- DeepSeek API key.
+- Docker for the default setup, or .NET 8 SDK plus PostgreSQL if running manually.
 
 ## Quick Start
 
@@ -25,7 +26,7 @@ It includes:
 cp .env.example .env
 ```
 
-2. Set `TELEGRAM__BOTTOKEN` in `.env`.
+2. Set `TELEGRAM__BOTTOKEN` and `DeepSeek__ApiKey` in `.env`.
 
 3. Choose host binding in `.env`.
 
@@ -54,21 +55,7 @@ ASPNETCORE_URLS=http://+:8080
 docker compose up --build
 ```
 
-5. Optional: start local Ollama on the same server:
-
-```bash
-docker compose --profile llm up -d ollama
-```
-
-The Ollama image is large. On a small VPS, either increase disk space or run Ollama on another machine and point `Ollama__BaseUrl` to that host.
-
-6. Pull a local model for Ollama:
-
-```bash
-docker compose exec ollama ollama pull qwen2.5:7b
-```
-
-7. Register webhook:
+5. Register webhook:
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
@@ -86,7 +73,7 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
   }'
 ```
 
-8. Open the web UI:
+6. Open the web UI:
 
 ```text
 http://localhost:8080
