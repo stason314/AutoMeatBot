@@ -9,7 +9,6 @@ services:
       - .env
     depends_on:
       - postgres
-      - ollama
 
   postgres:
     image: postgres:16
@@ -24,6 +23,8 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    profiles:
+      - llm
     ports:
       - "11434:11434"
     volumes:
@@ -32,4 +33,3 @@ services:
 volumes:
   postgres_data:
   ollama_data:
-
