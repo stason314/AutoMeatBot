@@ -1,6 +1,6 @@
-using AutoMeatBot.Api.Data;
 using AutoMeatBot.Api.Domain;
 using AutoMeatBot.Api.Dtos;
+using AutoMeatBot.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace AutoMeatBot.Api.Services;
@@ -139,4 +139,3 @@ public sealed class MeetingMutationService(AppDbContext db)
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 }
-

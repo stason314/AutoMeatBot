@@ -1,6 +1,6 @@
-using AutoMeatBot.Api.Data;
 using AutoMeatBot.Api.Domain;
 using AutoMeatBot.Api.Options;
+using AutoMeatBot.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.Json;

@@ -1,7 +1,7 @@
-using AutoMeatBot.Api.Data;
 using AutoMeatBot.Api.Domain;
 using AutoMeatBot.Api.Dtos;
 using AutoMeatBot.Api.Options;
+using AutoMeatBot.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -213,4 +213,3 @@ public sealed class MeetingAnalysisService(
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
     }
 }
-

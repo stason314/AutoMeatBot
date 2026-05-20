@@ -7,6 +7,5 @@ obj/
 *.suo
 
 .env
-data/
-logs/
-
+/data/
+/logs/
