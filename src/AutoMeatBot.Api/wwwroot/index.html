@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AutoMeatBot</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>AutoMeatBot</h1>
+      <p>Meeting candidates from Telegram chats</p>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab active" data-view="meetings">Meetings</button>
+      <button class="tab" data-view="people">People</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="meetings-view" class="view active">
+      <div class="section-head">
+        <h2>Meetings</h2>
+        <button id="refresh-meetings" class="secondary">Refresh</button>
+      </div>
+      <div id="meetings-list" class="list"></div>
+    </section>
+
+    <section id="people-view" class="view">
+      <div class="section-head">
+        <h2>Telegram to email</h2>
+        <button id="refresh-people" class="secondary">Refresh</button>
+      </div>
+      <form id="person-form" class="inline-form">
+        <input name="telegramUsername" placeholder="@telegram" autocomplete="off">
+        <input name="displayName" placeholder="Name" autocomplete="off">
+        <input name="email" placeholder="email@company.com" type="email" required>
+        <button type="submit">Add</button>
+      </form>
+      <div id="people-list" class="table"></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
+
