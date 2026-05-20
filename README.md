@@ -27,13 +27,28 @@ cp .env.example .env
 
 2. Set `TELEGRAM__BOTTOKEN` in `.env`.
 
-3. Start the API and PostgreSQL:
+3. Choose host binding in `.env`.
+
+For public access on port 8080:
+
+```env
+HOST_BIND_IP=0.0.0.0
+HOST_HTTP_PORT=8080
+```
+
+If port 8080 is already used, choose another host port:
+
+```env
+HOST_HTTP_PORT=8081
+```
+
+4. Start the API and PostgreSQL:
 
 ```bash
 docker compose up --build
 ```
 
-4. Optional: start local Ollama on the same server:
+5. Optional: start local Ollama on the same server:
 
 ```bash
 docker compose --profile llm up -d ollama
@@ -41,13 +56,13 @@ docker compose --profile llm up -d ollama
 
 The Ollama image is large. On a small VPS, either increase disk space or run Ollama on another machine and point `Ollama__BaseUrl` to that host.
 
-5. Pull a local model for Ollama:
+6. Pull a local model for Ollama:
 
 ```bash
 docker compose exec ollama ollama pull qwen2.5:7b
 ```
 
-6. Register webhook:
+7. Register webhook:
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
@@ -65,7 +80,7 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
   }'
 ```
 
-7. Open the web UI:
+8. Open the web UI:
 
 ```text
 http://localhost:8080
