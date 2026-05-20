@@ -42,6 +42,12 @@ If port 8080 is already used, choose another host port:
 HOST_HTTP_PORT=8081
 ```
 
+Keep the container URL fixed:
+
+```env
+ASPNETCORE_URLS=http://+:8080
+```
+
 4. Start the API and PostgreSQL:
 
 ```bash
